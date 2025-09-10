@@ -1,4 +1,3 @@
-// backend/services/excelService.js
 const ExcelJS = require('exceljs');
 const path = require('path');
 const fs = require('fs');
@@ -32,51 +31,55 @@ class ExcelService {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet(`Attendance - ${date}`);
 
-      // Add MIT-ADT University header
-      worksheet.mergeCells('A1:G1');
-      worksheet.getCell('A1').value = 'MIT-ADT UNIVERSITY';
-      worksheet.getCell('A1').font = { bold: true, size: 16, color: { argb: 'FF0066CC' } };
-      worksheet.getCell('A1').alignment = { horizontal: 'center' };
+      // Set worksheet properties
+      worksheet.properties.defaultRowHeight = 20;
+      worksheet.views = [{ showGridLines: true }];
 
-      worksheet.mergeCells('A2:G2');
-      worksheet.getCell('A2').value = 'PUNE, INDIA - A leap towards World Class Education';
-      worksheet.getCell('A2').font = { bold: true, size: 10 };
+      // University Header
+      worksheet.mergeCells('A1:H1');
+      worksheet.getCell('A1').value = 'MIT-ADT UNIVERSITY';
+      worksheet.getCell('A1').font = { bold: true, size: 18, color: { argb: 'FF1F4E79' } };
+      worksheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
+      worksheet.getCell('A1').fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE7F3FF' }
+      };
+      
+      worksheet.mergeCells('A2:H2');
+      worksheet.getCell('A2').value = 'DEPARTMENT OF COMPUTER SCIENCE & ENGINEERING';
+      worksheet.getCell('A2').font = { bold: true, size: 14, color: { argb: 'FF1F4E79' } };
       worksheet.getCell('A2').alignment = { horizontal: 'center' };
 
-      worksheet.mergeCells('A3:G3');
-      worksheet.getCell('A3').value = 'DEPARTMENT OF COMPUTER SCIENCE & ENGINEERING';
-      worksheet.getCell('A3').font = { bold: true, size: 12 };
+      worksheet.mergeCells('A3:H3');
+      worksheet.getCell('A3').value = `DAILY ATTENDANCE SHEET - Class: ${classId}`;
+      worksheet.getCell('A3').font = { bold: true, size: 16 };
       worksheet.getCell('A3').alignment = { horizontal: 'center' };
 
-      // Add class and date info
-      worksheet.mergeCells('A4:G4');
-      worksheet.getCell('A4').value = `DAILY ATTENDANCE SHEET`;
-      worksheet.getCell('A4').font = { bold: true, size: 14 };
+      worksheet.mergeCells('A4:H4');
+      worksheet.getCell('A4').value = `Date: ${new Date(date).toLocaleDateString('en-IN', { 
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+      })}`;
+      worksheet.getCell('A4').font = { bold: true, size: 12 };
       worksheet.getCell('A4').alignment = { horizontal: 'center' };
 
-      worksheet.mergeCells('A5:C5');
-      worksheet.getCell('A5').value = `Class: ${classId}`;
-      worksheet.getCell('A5').font = { bold: true };
+      // Add spacing
+      worksheet.addRow([]);
 
-      worksheet.mergeCells('E5:G5');
-      worksheet.getCell('E5').value = `Date: ${date}`;
-      worksheet.getCell('E5').font = { bold: true };
-      worksheet.getCell('E5').alignment = { horizontal: 'right' };
-
-      // Add column headers
-      const headers = ['Sr. No.', 'Student ID', 'Student Name', 'Time In', 'Status', 'Method', 'Signature'];
-      const headerRow = worksheet.addRow([]);
-      worksheet.addRow(headers);
+      // Column headers
+      const headers = [
+        'Sr. No.', 'Student ID', 'Student Name', 'Time In', 
+        'Status', 'Method', 'Confidence', 'Signature'
+      ];
+      const headerRow = worksheet.addRow(headers);
       
-      const headerRowIndex = 7;
-      headers.forEach((header, index) => {
-        const cell = worksheet.getCell(headerRowIndex, index + 1);
-        cell.value = header;
-        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      // Style header row
+      headerRow.eachCell((cell, colNumber) => {
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12 };
         cell.fill = {
           type: 'pattern',
           pattern: 'solid',
-          fgColor: { argb: 'FF0066CC' }
+          fgColor: { argb: 'FF1F4E79' }
         };
         cell.border = {
           top: { style: 'thin' },
@@ -88,20 +91,19 @@ class ExcelService {
       });
 
       // Add student data
-      let rowIndex = headerRowIndex + 1;
       studentsData.forEach((student, index) => {
-        const row = worksheet.getRow(rowIndex);
-        row.values = [
+        const row = worksheet.addRow([
           index + 1,
           student.studentId,
           student.name,
           student.timeIn || '',
           student.status || 'Absent',
           student.method || '',
+          student.confidence ? `${(student.confidence * 100).toFixed(1)}%` : '',
           '' // Signature column
-        ];
+        ]);
 
-        // Style the row
+        // Style the data row
         row.eachCell((cell, colNumber) => {
           cell.border = {
             top: { style: 'thin' },
@@ -109,7 +111,11 @@ class ExcelService {
             bottom: { style: 'thin' },
             right: { style: 'thin' }
           };
-          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          
+          // Center align certain columns
+          if ([1, 4, 5, 6, 7].includes(colNumber)) {
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          }
         });
 
         // Color code based on status
@@ -120,69 +126,93 @@ class ExcelService {
             pattern: 'solid',
             fgColor: { argb: 'FF90EE90' } // Light green
           };
+          statusCell.font = { bold: true };
+        } else if (student.status === 'Late') {
+          statusCell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFFFFF00' } // Yellow
+          };
+          statusCell.font = { bold: true };
         } else {
           statusCell.fill = {
             type: 'pattern',
             pattern: 'solid',
-            fgColor: { argb: 'FFFF6B6B' } // Light red
+            fgColor: { argb: 'FFFF9999' } // Light red
           };
+          statusCell.font = { bold: true };
         }
-
-        rowIndex++;
-      });
-
-      // Add summary row
-      const summaryRow = worksheet.getRow(rowIndex + 1);
-      const totalPresent = studentsData.filter(s => s.status === 'Present').length;
-      const totalAbsent = studentsData.length - totalPresent;
-      const attendancePercentage = studentsData.length > 0 ? ((totalPresent / studentsData.length) * 100).toFixed(1) : 0;
-
-      summaryRow.values = [
-        '', 
-        '', 
-        'SUMMARY:', 
-        `Total: ${studentsData.length}`,
-        `Present: ${totalPresent}`,
-        `Absent: ${totalAbsent}`,
-        `${attendancePercentage}%`
-      ];
-      
-      summaryRow.font = { bold: true };
-      summaryRow.eachCell((cell) => {
-        cell.fill = {
-          type: 'pattern',
-          pattern: 'solid',
-          fgColor: { argb: 'FFE6E6FA' }
-        };
-        cell.border = {
-          top: { style: 'thin' },
-          left: { style: 'thin' },
-          bottom: { style: 'thin' },
-          right: { style: 'thin' }
-        };
       });
 
       // Set column widths
       worksheet.columns = [
         { width: 8 },   // Sr. No.
-        { width: 15 },  // Student ID
-        { width: 25 },  // Student Name
-        { width: 12 },  // Time In
-        { width: 10 },  // Status
-        { width: 15 },  // Method
-        { width: 20 }   // Signature
+        { width: 18 },  // Student ID
+        { width: 35 },  // Student Name
+        { width: 15 },  // Time In
+        { width: 12 },  // Status
+        { width: 18 },  // Method
+        { width: 12 },  // Confidence
+        { width: 25 }   // Signature
       ];
 
-      // Add teacher signature section
-      const signatureRowIndex = rowIndex + 3;
-      worksheet.getCell(signatureRowIndex, 1).value = 'Teacher Signature:';
-      worksheet.getCell(signatureRowIndex, 1).font = { bold: true };
-      
-      worksheet.getCell(signatureRowIndex, 5).value = 'Date:';
-      worksheet.getCell(signatureRowIndex, 5).font = { bold: true };
+      // Add summary section
+      worksheet.addRow([]); // Empty row
+      const totalPresent = studentsData.filter(s => s.status === 'Present').length;
+      const totalLate = studentsData.filter(s => s.status === 'Late').length;
+      const totalAbsent = studentsData.filter(s => s.status === 'Absent').length;
+      const attendanceRate = studentsData.length > 0 ? 
+        (((totalPresent + totalLate) / studentsData.length) * 100).toFixed(2) : 0;
+
+      // Summary header
+      const summaryHeaderRow = worksheet.addRow(['', '', 'ATTENDANCE SUMMARY', '', '', '', '', '']);
+      summaryHeaderRow.getCell(3).font = { bold: true, size: 14, color: { argb: 'FF1F4E79' } };
+      summaryHeaderRow.getCell(3).alignment = { horizontal: 'center' };
+
+      // Summary data
+      const summaryRows = [
+        ['', '', 'Total Students:', studentsData.length, '', '', '', ''],
+        ['', '', 'Present:', totalPresent, '', '', '', ''],
+        ['', '', 'Late:', totalLate, '', '', '', ''],
+        ['', '', 'Absent:', totalAbsent, '', '', '', ''],
+        ['', '', 'Attendance Rate:', `${attendanceRate}%`, '', '', '', '']
+      ];
+
+      summaryRows.forEach(rowData => {
+        const row = worksheet.addRow(rowData);
+        row.getCell(3).font = { bold: true };
+        row.getCell(4).font = { bold: true };
+        
+        // Color code the attendance rate
+        if (rowData[2] === 'Attendance Rate:') {
+          const rate = parseFloat(attendanceRate);
+          if (rate >= 75) {
+            row.getCell(4).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF90EE90' } };
+          } else if (rate >= 60) {
+            row.getCell(4).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+          } else {
+            row.getCell(4).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFF9999' } };
+          }
+        }
+      });
+
+      // Add footer
+      worksheet.addRow([]); // Empty row
+      const footerRow1 = worksheet.addRow([
+        '', '', 'Faculty Signature: ____________________', '', 
+        'HOD Signature: ____________________', '', '', ''
+      ]);
+      const footerRow2 = worksheet.addRow([
+        '', '', `Generated on: ${new Date().toLocaleString('en-IN')}`, '', 
+        'Time: ____________________', '', '', ''
+      ]);
+
+      footerRow1.eachCell(cell => {
+        cell.font = { bold: true };
+      });
 
       // Save file
-      const filename = `attendance_${classId}_${date}.xlsx`;
+      const filename = `attendance_${classId}_${date.replace(/\-/g, '_')}.xlsx`;
       const filepath = path.join(this.exportsPath, 'daily_sheets', filename);
       
       await workbook.xlsx.writeFile(filepath);
@@ -192,11 +222,12 @@ class ExcelService {
         filename,
         filepath,
         downloadUrl: `/api/reports/download/daily/${filename}`,
-        summary: {
+        statistics: {
           totalStudents: studentsData.length,
           present: totalPresent,
+          late: totalLate,
           absent: totalAbsent,
-          percentage: attendancePercentage
+          attendancePercentage: attendanceRate
         }
       };
 
@@ -206,79 +237,61 @@ class ExcelService {
     }
   }
 
-  async updateAttendanceSheet(classId, date, attendanceUpdate) {
+  async updateAttendanceSheet(classId, date, attendanceUpdates) {
     try {
-      const filename = `attendance_${classId}_${date}.xlsx`;
+      const filename = `attendance_${classId}_${date.replace(/\-/g, '_')}.xlsx`;
       const filepath = path.join(this.exportsPath, 'daily_sheets', filename);
       
       let workbook;
-      let studentsWithAttendance;
       
       if (fs.existsSync(filepath)) {
         // Load existing file
         workbook = new ExcelJS.Workbook();
         await workbook.xlsx.readFile(filepath);
-        
-        const worksheet = workbook.getWorksheet(`Attendance - ${date}`);
-        
-        // Update attendance records
-        attendanceUpdate.forEach(record => {
-          // Find student row by student ID
-          worksheet.eachRow((row, rowNumber) => {
-            if (rowNumber > 7 && row.getCell(2).value === record.studentId) {
-              row.getCell(4).value = record.timeIn; // Time In
-              row.getCell(5).value = 'Present'; // Status
-              row.getCell(6).value = record.method || 'Face Recognition'; // Method
-              
-              // Color the status cell green
-              row.getCell(5).fill = {
-                type: 'pattern',
-                pattern: 'solid',
-                fgColor: { argb: 'FF90EE90' }
-              };
-            }
-          });
-        });
-        
-        // Update summary
-        const { totalPresent, totalAbsent, percentage } = this.calculateSummary(worksheet);
-        
-        // Find summary row and update
-        worksheet.eachRow((row, rowNumber) => {
-          if (row.getCell(3).value === 'SUMMARY:') {
-            row.getCell(5).value = `Present: ${totalPresent}`;
-            row.getCell(6).value = `Absent: ${totalAbsent}`;
-            row.getCell(7).value = `${percentage}%`;
-          }
-        });
-
-        // Save updated file
-        await workbook.xlsx.writeFile(filepath);
-        
       } else {
         // Create new file if doesn't exist
         const allStudents = await this.getAllStudentsInClass(classId);
-        
-        // Mark attendance for updated students
-        studentsWithAttendance = allStudents.map(student => {
-          const attendanceRecord = attendanceUpdate.find(a => a.studentId === student.studentId);
-          return {
-            studentId: student.studentId,
-            name: student.name,
-            timeIn: attendanceRecord ? attendanceRecord.timeIn : '',
-            status: attendanceRecord ? 'Present' : 'Absent',
-            method: attendanceRecord ? (attendanceRecord.method || 'Face Recognition') : ''
-          };
-        });
-        
-        return await this.createDailyAttendanceSheet(classId, date, studentsWithAttendance);
+        const studentsData = await this.prepareStudentsData(allStudents, classId, date);
+        return await this.createDailyAttendanceSheet(classId, date, studentsData);
       }
+
+      const worksheet = workbook.getWorksheet(`Attendance - ${date}`);
+      
+      if (!worksheet) {
+        throw new Error('Worksheet not found');
+      }
+
+      // Update attendance records
+      attendanceUpdates.forEach(record => {
+        worksheet.eachRow((row, rowNumber) => {
+          const studentIdCell = row.getCell(2);
+          if (studentIdCell.value === record.studentId) {
+            row.getCell(4).value = record.timeIn; // Time In
+            row.getCell(5).value = 'Present'; // Status
+            row.getCell(6).value = record.method || 'Face Recognition'; // Method
+            
+            // Color the status cell green
+            row.getCell(5).fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FF90EE90' }
+            };
+            row.getCell(5).font = { bold: true };
+          }
+        });
+      });
+
+      // Recalculate and update summary
+      await this.updateSummarySection(worksheet);
+
+      // Save updated file
+      await workbook.xlsx.writeFile(filepath);
       
       return {
         success: true,
         filename,
         filepath,
-        updatedRecords: attendanceUpdate.length,
+        updatedRecords: attendanceUpdates.length,
         downloadUrl: `/api/reports/download/daily/${filename}`
       };
 
@@ -286,31 +299,6 @@ class ExcelService {
       console.error('Excel update error:', error);
       throw error;
     }
-  }
-
-  calculateSummary(worksheet) {
-    let totalPresent = 0;
-    let totalStudents = 0;
-    
-    worksheet.eachRow((row, rowNumber) => {
-      if (rowNumber > 7 && row.getCell(2).value && row.getCell(3).value !== 'SUMMARY:') {
-        totalStudents++;
-        if (row.getCell(5).value === 'Present') {
-          totalPresent++;
-        }
-      }
-    });
-    
-    const totalAbsent = totalStudents - totalPresent;
-    const percentage = totalStudents > 0 ? ((totalPresent / totalStudents) * 100).toFixed(1) : 0;
-    
-    return { totalPresent, totalAbsent, percentage };
-  }
-
-  async getAllStudentsInClass(classId) {
-    return await Student.find({ class: classId, isActive: true })
-                        .sort({ studentId: 1 })
-                        .select('studentId name');
   }
 
   async generateMonthlyReport(classId, month, year) {
@@ -321,7 +309,7 @@ class ExcelService {
       // Header
       worksheet.mergeCells('A1:AH1');
       worksheet.getCell('A1').value = 'MIT-ADT UNIVERSITY - MONTHLY ATTENDANCE REPORT';
-      worksheet.getCell('A1').font = { bold: true, size: 14, color: { argb: 'FF0066CC' } };
+      worksheet.getCell('A1').font = { bold: true, size: 16, color: { argb: 'FF1F4E79' } };
       worksheet.getCell('A1').alignment = { horizontal: 'center' };
 
       worksheet.mergeCells('A2:AH2');
@@ -329,26 +317,26 @@ class ExcelService {
       worksheet.getCell('A2').font = { bold: true, size: 12 };
       worksheet.getCell('A2').alignment = { horizontal: 'center' };
 
-      // Get monthly attendance data
+      // Get monthly data
       const studentsData = await this.getMonthlyAttendanceData(classId, month, year);
       const daysInMonth = new Date(year, month, 0).getDate();
 
       // Create headers
-      const headers = ['Sr. No.', 'Student ID', 'Student Name'];
+      const headers = ['Sr.', 'Student ID', 'Name'];
       
       // Add date columns
       for (let day = 1; day <= daysInMonth; day++) {
         headers.push(day.toString());
       }
       
-      headers.push('Total Present', 'Total Absent', 'Percentage');
+      headers.push('Present', 'Absent', 'Late', 'Percentage');
       
       const headerRow = worksheet.addRow(headers);
-      headerRow.font = { bold: true };
+      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
       headerRow.fill = {
         type: 'pattern',
         pattern: 'solid',
-        fgColor: { argb: 'FF0066CC' }
+        fgColor: { argb: 'FF1F4E79' }
       };
 
       // Add student data
@@ -356,47 +344,104 @@ class ExcelService {
         const row = [index + 1, student.studentId, student.name];
         
         let totalPresent = 0;
+        let totalLate = 0;
+        let totalDays = 0;
         
         // Add attendance for each day
         for (let day = 1; day <= daysInMonth; day++) {
           const dateStr = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-          const isPresent = student.attendance[dateStr];
+          const dayOfWeek = new Date(year, month - 1, day).getDay();
           
-          if (isPresent) {
+          // Skip Sundays (0) - adjust based on your institution's schedule
+          if (dayOfWeek === 0) {
+            row.push('-');
+            continue;
+          }
+          
+          totalDays++;
+          const attendanceStatus = student.attendance[dateStr];
+          
+          if (attendanceStatus === 'Present') {
             row.push('P');
             totalPresent++;
+          } else if (attendanceStatus === 'Late') {
+            row.push('L');
+            totalLate++;
           } else {
             row.push('A');
           }
         }
         
-        const totalAbsent = daysInMonth - totalPresent;
-        const percentage = ((totalPresent / daysInMonth) * 100).toFixed(1);
+        const totalAbsent = totalDays - totalPresent - totalLate;
+        const percentage = totalDays > 0 ? 
+          (((totalPresent + totalLate) / totalDays) * 100).toFixed(1) : '0.0';
         
-        row.push(totalPresent, totalAbsent, `${percentage}%`);
+        row.push(totalPresent, totalAbsent, totalLate, `${percentage}%`);
         
         const dataRow = worksheet.addRow(row);
         
-        // Color code percentage
+        // Color code percentage and attendance markers
         const percentageCell = dataRow.getCell(headers.length);
-        if (percentage >= 75) {
+        const percentageValue = parseFloat(percentage);
+        
+        if (percentageValue >= 75) {
           percentageCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF90EE90' } };
-        } else if (percentage >= 60) {
+        } else if (percentageValue >= 60) {
           percentageCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
         } else {
           percentageCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFF6B6B' } };
         }
+        
+        // Color code attendance markers
+        dataRow.eachCell((cell, colNumber) => {
+          if (colNumber > 3 && colNumber <= 3 + daysInMonth) {
+            cell.alignment = { horizontal: 'center' };
+            if (cell.value === 'P') {
+              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF90EE90' } };
+              cell.font = { bold: true, color: { argb: 'FF006600' } };
+            } else if (cell.value === 'L') {
+              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+              cell.font = { bold: true, color: { argb: 'FF996600' } };
+            } else if (cell.value === 'A') {
+              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFF9999' } };
+              cell.font = { bold: true, color: { argb: 'FF990000' } };
+            }
+          }
+        });
       });
 
       // Set column widths
-      worksheet.columns.forEach((column, index) => {
-        if (index < 3) {
-          column.width = index === 2 ? 25 : 15;
-        } else if (index >= headers.length - 3) {
-          column.width = 12;
-        } else {
-          column.width = 4;
-        }
+      worksheet.getColumn(1).width = 5;   // Sr.
+      worksheet.getColumn(2).width = 15;  // Student ID
+      worksheet.getColumn(3).width = 30;  // Name
+      
+      for (let i = 4; i <= 3 + daysInMonth; i++) {
+        worksheet.getColumn(i).width = 3; // Date columns
+      }
+      
+      // Statistics columns
+      worksheet.getColumn(3 + daysInMonth + 1).width = 8;  // Present
+      worksheet.getColumn(3 + daysInMonth + 2).width = 8;  // Absent
+      worksheet.getColumn(3 + daysInMonth + 3).width = 8;  // Late
+      worksheet.getColumn(3 + daysInMonth + 4).width = 12; // Percentage
+
+      // Add legend
+      const legendStartRow = studentsData.length + 5;
+      worksheet.getCell(`A${legendStartRow}`).value = 'Legend:';
+      worksheet.getCell(`A${legendStartRow}`).font = { bold: true, size: 12 };
+      
+      const legendItems = [
+        ['P = Present', 'A = Absent'],
+        ['L = Late', '- = Holiday/Sunday']
+      ];
+
+      legendItems.forEach((items, index) => {
+        const row = worksheet.addRow(['', ...items]);
+        row.eachCell((cell, colNumber) => {
+          if (colNumber > 1) {
+            cell.font = { bold: true };
+          }
+        });
       });
 
       // Save file
@@ -410,11 +455,7 @@ class ExcelService {
         filename,
         filepath,
         downloadUrl: `/api/reports/download/reports/${filename}`,
-        summary: {
-          totalStudents: studentsData.length,
-          month: `${month}/${year}`,
-          daysInMonth
-        }
+        statistics: this.calculateMonthlyStatistics(studentsData, daysInMonth)
       };
 
     } catch (error) {
@@ -423,31 +464,147 @@ class ExcelService {
     }
   }
 
+  // Helper methods
+  async getAllStudentsInClass(classId) {
+    return await Student.find({ class: classId, isActive: true }).sort({ studentId: 1 });
+  }
+
+  async prepareStudentsData(students, classId, date) {
+    const attendanceRecords = await Attendance.find({
+      classId,
+      date,
+      status: { $in: ['Present', 'Late', 'Absent'] }
+    });
+
+    return students.map(student => {
+      const attendanceRecord = attendanceRecords.find(a => a.studentId === student.studentId);
+      return {
+        studentId: student.studentId,
+        name: student.name,
+        timeIn: attendanceRecord ? attendanceRecord.timestamp.toLocaleTimeString() : '',
+        status: attendanceRecord ? attendanceRecord.status : 'Absent',
+        method: attendanceRecord ? attendanceRecord.method : '',
+        confidence: attendanceRecord ? attendanceRecord.confidence : null
+      };
+    });
+  }
+
   async getMonthlyAttendanceData(classId, month, year) {
     const students = await Student.find({ class: classId, isActive: true });
-    const monthlyData = [];
+    const startDate = `${year}-${month.toString().padStart(2, '0')}-01`;
+    const endDate = `${year}-${month.toString().padStart(2, '0')}-31`;
     
-    for (const student of students) {
-      const attendanceRecords = await Attendance.find({
+    const attendanceRecords = await Attendance.find({
+      classId,
+      date: { $gte: startDate, $lte: endDate }
+    });
+    
+    return students.map(student => {
+      const studentAttendance = {};
+      attendanceRecords
+        .filter(record => record.studentId === student.studentId)
+        .forEach(record => {
+          studentAttendance[record.date] = record.status;
+        });
+      
+      return {
         studentId: student.studentId,
-        date: {
-          $regex: `^${year}-${month.toString().padStart(2, '0')}`
+        name: student.name,
+        attendance: studentAttendance
+      };
+    });
+  }
+
+  calculateMonthlyStatistics(studentsData, totalDays) {
+    const stats = {
+      totalStudents: studentsData.length,
+      averageAttendance: 0,
+      highPerformers: 0, // >= 90%
+      goodPerformers: 0,  // >= 75%
+      lowPerformers: 0,   // < 60%
+      criticalPerformers: 0 // < 40%
+    };
+
+    if (studentsData.length === 0) return stats;
+
+    let totalPercentage = 0;
+    
+    studentsData.forEach(student => {
+      // Calculate individual percentage
+      let presentDays = 0;
+      let lateDays = 0;
+      let validDays = 0;
+      
+      Object.values(student.attendance).forEach(status => {
+        if (status && status !== '-') {
+          validDays++;
+          if (status === 'Present') presentDays++;
+          else if (status === 'Late') lateDays++;
         }
       });
       
-      const attendanceMap = {};
-      attendanceRecords.forEach(record => {
-        attendanceMap[record.date] = record.status === 'Present';
-      });
+      const percentage = validDays > 0 ? ((presentDays + lateDays) / validDays) * 100 : 0;
+      totalPercentage += percentage;
       
-      monthlyData.push({
-        studentId: student.studentId,
-        name: student.name,
-        attendance: attendanceMap
-      });
-    }
-    
-    return monthlyData;
+      // Categorize performance
+      if (percentage >= 90) stats.highPerformers++;
+      else if (percentage >= 75) stats.goodPerformers++;
+      else if (percentage >= 60) /* normal performers - not counted separately */;
+      else if (percentage >= 40) stats.lowPerformers++;
+      else stats.criticalPerformers++;
+    });
+
+    stats.averageAttendance = (totalPercentage / studentsData.length).toFixed(2);
+
+    return stats;
+  }
+
+  async updateSummarySection(worksheet) {
+    let totalPresent = 0;
+    let totalLate = 0;
+    let totalAbsent = 0;
+    let totalStudents = 0;
+
+    // Count attendance from data rows
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber > 6) { // Skip header rows
+        const statusCell = row.getCell(5);
+        if (statusCell.value) {
+          totalStudents++;
+          switch (statusCell.value) {
+            case 'Present':
+              totalPresent++;
+              break;
+            case 'Late':
+              totalLate++;
+              break;
+            case 'Absent':
+              totalAbsent++;
+              break;
+          }
+        }
+      }
+    });
+
+    const attendanceRate = totalStudents > 0 ? 
+      (((totalPresent + totalLate) / totalStudents) * 100).toFixed(2) : 0;
+
+    // Update summary rows (implementation depends on worksheet structure)
+    // This is a simplified version - you may need to locate and update specific cells
+    worksheet.eachRow((row, rowNumber) => {
+      const cell3 = row.getCell(3);
+      if (cell3.value === 'Total Students:') {
+        row.getCell(4).value = totalStudents;
+      } else if (cell3.value === 'Present:') {
+        row.getCell(4).value = totalPresent;
+      } else if (cell3.value === 'Late:') {
+        row.getCell(4).value = totalLate;
+      } else if (cell3.value === 'Absent:') {
+        row.getCell(4).value = totalAbsent;
+      } else if (cell3.value === 'Attendance Rate:') {
+        row.getCell(4).value = `${attendanceRate}%`;
+      }
+    });
   }
 }
 
